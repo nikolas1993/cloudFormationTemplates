@@ -13,7 +13,7 @@ Resources:
       Timeout: 900
       Role: !GetAtt TriggerLambdaIamRole.Arn
   
-  TriggerLambdaIamRole:
+  HelloLambdaIamRole:
     Type: 'AWS::IAM::Role'
     Properties:
       AssumeRolePolicyDocument:
@@ -26,6 +26,8 @@ Resources:
             Action:
               - 'sts:AssumeRole'
       Path: /
+  
+
 
 
 Outputs:
