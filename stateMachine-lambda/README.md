@@ -1,5 +1,5 @@
 # Exercices Nikolas
-Template for creating a simple state machine that calls a lambda function
+Template for creating a simple state machine that calls a lambda function and displays an "hello" message
 
 
 ## Build & Deploy

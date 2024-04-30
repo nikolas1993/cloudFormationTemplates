@@ -1,21 +1,37 @@
-AWSTemplateFormatVersion: '2010-09-09'
+AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
 Description: Template CloudFormation - Exercices Nikolas
+
+Parameters:
+  HelloLambdaName:
+    Description: HelloLambda's name
+    Type: String
+    Default: nik-hello-lambda
+  HelloLambdaIamRoleName:
+    Description: HelloLambdaIamRole's name
+    Type: String
+    Default: nikHelloLambdaIAMRole
+  HelloStateMachineName:
+    Description: HelloStateMachine's name
+    Type: String
+    Default: sfNikHelloStateMachine
 
 Resources:
   HelloLambda: #lambda:
     Type: AWS::Serverless::Function
     Properties:
+      FunctionName: !Ref HelloLambdaName
       CodeUri: lambda
       Handler: nik-hello-function.entrypoint
       Runtime: python3.12
       MemorySize: 1280
       Timeout: 900
       Role: !GetAtt HelloLambdaIamRole.Arn
-  
+
   HelloLambdaIamRole:
-    Type: 'AWS::IAM::Role'
+    Type: "AWS::IAM::Role"
     Properties:
+      RoleName: !Ref HelloLambdaIamRoleName
       AssumeRolePolicyDocument:
         Version: 2012-10-17
         Statement:
@@ -24,13 +40,31 @@ Resources:
               Service:
                 - lambda.amazonaws.com
             Action:
-              - 'sts:AssumeRole'
+              - "sts:AssumeRole"
       Path: /
-  
+      Policies:
+        - PolicyName: root
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource: 'arn:aws:logs:*:*:*'
 
-
+  # HelloStateMachine: #state-machine
+  #   Type: AWS::Serverless::StateMachine
+  #   Properties:
+  #     Name: !Ref HelloLambdaName
+  #     Type: STANDARD
+  #     DefinitionUri: state-machine.yaml
 
 Outputs:
   StackName:
     Description: Deployed StackName for update
-    Value: !Ref AWS::StackName  
+    Value: !Ref AWS::StackName
+  LambdaName:
+    Description: Deployed LambdaName for update
+    Value: !Ref HelloLambda
