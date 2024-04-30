@@ -1,0 +1,34 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Template CloudFormation - Exercices Nikolas
+
+Resources:
+  HelloLambda: #lambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lambda
+      Handler: nik-hello-function.entrypoint
+      Runtime: python3.12
+      MemorySize: 1280
+      Timeout: 900
+      Role: !GetAtt TriggerLambdaIamRole.Arn
+  
+  TriggerLambdaIamRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+
+
+Outputs:
+  StackName:
+    Description: Deployed StackName for update
+    Value: !Ref AWS::StackName  
