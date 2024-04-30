@@ -15,6 +15,10 @@ Parameters:
     Description: HelloStateMachine's name
     Type: String
     Default: sfNikHelloStateMachine
+  HelloStateMachineRoleName:
+    Description: HelloStateMachineRole's name
+    Type: String
+    Default: nikHelloStateMachineIAMRole
 
 Resources:
   HelloLambda: #lambda:
@@ -80,6 +84,7 @@ Resources:
   HelloStateMachineRole:
     Type: AWS::IAM::Role
     Properties:
+      RoleName: !Ref HelloStateMachineRoleName
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -119,4 +124,4 @@ Outputs:
     Value: !Ref HelloLambda
   StateMachineName:
     Description: Deployed LambdaName for update
-    Value: !Ref HelloStateMachine
+    Value: !Ref HelloStateMachineName
