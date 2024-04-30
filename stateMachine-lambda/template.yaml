@@ -33,7 +33,7 @@ Resources:
     Properties:
       RoleName: !Ref HelloLambdaIamRoleName
       AssumeRolePolicyDocument:
-        Version: 2012-10-17
+        Version: "2012-10-17"
         Statement:
           - Effect: Allow
             Principal:
@@ -45,7 +45,7 @@ Resources:
       Policies:
         - PolicyName: root
           PolicyDocument:
-            Version: 2012-10-17
+            Version: "2012-10-17"
             Statement:
               - Effect: Allow
                 Action:
@@ -54,12 +54,61 @@ Resources:
                   - 'logs:PutLogEvents'
                 Resource: 'arn:aws:logs:*:*:*'
 
-  # HelloStateMachine: #state-machine
-  #   Type: AWS::Serverless::StateMachine
-  #   Properties:
-  #     Name: !Ref HelloLambdaName
-  #     Type: STANDARD
-  #     DefinitionUri: state-machine.yaml
+  HelloStateMachine: #state-machine
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      Name: !Ref HelloStateMachineName
+      Type: STANDARD
+      DefinitionUri: state-machine.yaml
+      Role: !GetAtt HelloStateMachineRole.Arn
+      Logging:
+        Destinations:
+          - CloudWatchLogsLogGroup:
+              LogGroupArn: !GetAtt HelloStateMachineLog.Arn
+        Level: ALL
+        IncludeExecutionData: True
+      DefinitionSubstitutions:
+        HelloLambdaArn: !GetAtt HelloLambda.Arn
+        ApplicationName: !Ref HelloStateMachineName
+
+  HelloStateMachineLog:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 3
+      LogGroupName: !Sub /aws/vendedlogs/states/${HelloStateMachineName}-statemachine-logs
+
+  HelloStateMachineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - states.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: "lambda-and-logs"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogDelivery'
+                  - 'logs:GetLogDelivery'
+                  - 'logs:UpdateLogDelivery'
+                  - 'logs:DeleteLogDelivery'
+                  - 'logs:ListLogDeliveries'
+                  - 'logs:PutResourcePolicy'
+                  - 'logs:DescribeResourcePolicies'
+                  - 'logs:DescribeLogGroups'
+                  - 'cloudwatch:PutMetricData'
+                Resource: '*'
+              - Effect: Allow
+                Action: "lambda:InvokeFunction"
+                Resource: !GetAtt HelloLambda.Arn
 
 Outputs:
   StackName:
@@ -68,3 +117,6 @@ Outputs:
   LambdaName:
     Description: Deployed LambdaName for update
     Value: !Ref HelloLambda
+  StateMachineName:
+    Description: Deployed LambdaName for update
+    Value: !Ref HelloStateMachine

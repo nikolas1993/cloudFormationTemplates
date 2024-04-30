@@ -1,0 +1,14 @@
+---
+StartAt: InvokeHelloLambda
+States:
+  InvokeHelloLambda:
+    Type: Task
+    Resource: arn:aws:states:::lambda:invoke
+    Parameters:
+      FunctionName: ${HelloLambdaArn}
+      Payload:
+        who.$: $.who
+    Next: End
+  End:
+    Type: Pass
+    End: true
