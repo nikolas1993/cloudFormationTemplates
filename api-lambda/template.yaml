@@ -1,0 +1,186 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Template CloudFormation - Exercices Nikolas
+
+Parameters:
+  StagingPathIN:
+    Type: String
+    Description: Source Path
+    Default: api-lambda/INCOMING
+  SupplyerPath:
+    Type: String
+    Description: Folder Supplyer Path
+    Default: supplyer/Nikolas
+  FileName:
+    Type: String
+    Description: File name of the file to send to the supplyer 
+    Default: File_Nikolas_
+  NikolasBucket:
+    Type: AWS::SSM::Parameter::Value<String>
+    Description: Nikolas' Bucket name
+    Default: /nikolas/bucket # formazione-sftp-simulator
+  JwtKey:
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: /nikolas/jwtKey
+  Stage:
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: /nik/api/stage
+
+Resources:
+  NikolasApiRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: APIPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource: 'arn:aws:logs:*:*:*'
+              - Effect: Allow
+                Action:
+                  - 's3:*'
+                Resource: !Join
+                - ''
+                - - 'arn:aws:s3:::'
+                  - !Ref NikolasBucket
+                  - '/*'
+              - Effect: Allow
+                Action:
+                  - 's3:*'
+                Resource: !Join
+                - ''
+                - - 'arn:aws:s3:::'
+                  - !Ref NikolasBucket
+                  - '/'
+              - Effect: Allow
+                Action:
+                  - 's3:*'
+                Resource: !Join
+                - ''
+                - - 'arn:aws:s3:::'
+                  - !Ref NikolasBucket
+              - Effect: Allow
+                Action:
+                  - 's3:*'
+                Resource: !Join
+                - ''
+                - - 'arn:aws:s3:::'
+                  - !Ref NikolasBucket
+  NikolasApiGateway:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: !Ref Stage
+      OpenApiVersion: 3.0.2
+      CacheClusterEnabled: false
+      CacheClusterSize: '0.5'
+      Cors:
+        AllowMethods: "'POST, GET'"
+        AllowHeaders: "'*'"
+        AllowOrigin: "'*'"
+        MaxAge: "'600'"
+      MethodSettings:
+        - ResourcePath: /
+          HttpMethod: GET
+          CachingEnabled: false
+          CacheTtlInSeconds: 300
+        - ResourcePath: /
+          HttpMethod: POST
+          CachingEnabled: false
+          CacheTtlInSeconds: 300
+  SendFileFunction: # Adds a POST API endpoint at "/" via an Api event
+    Type: AWS::Serverless::Function
+    Properties:
+      Role: !GetAtt NikolasApiRole.Arn
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            Path: /SendFile
+            Method: post
+            RestApiId:
+              Ref: NikolasApiGateway
+      Runtime: python3.12
+      CodeUri: lambda
+      Handler: send_file.lambda_handler
+      MemorySize: 525
+      Timeout: 600
+      Environment: 
+        Variables:
+          DestBucket: !Ref NikolasBucket
+          DestPath: !Ref SupplyerPath
+          SourceBucket: !Ref NikolasBucket
+          SourcePath: !Ref StagingPathIN
+          FileName: !Ref FileName
+          JwtKey: !Ref JwtKey
+  FileListFunction: # Adds a GET api endpoint at "/" via an Api event
+    Type: AWS::Serverless::Function
+    Properties:
+      Role: !GetAtt NikolasApiRole.Arn
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            Path: /FileList
+            Method: get
+            RestApiId:
+              Ref: NikolasApiGateway
+      Runtime: python3.12
+      CodeUri: lambda
+      Handler: send_file.lambda_handler_dir
+      MemorySize: 525
+      Timeout: 600
+      Environment: 
+        Variables:
+          DestBucket: !Ref NikolasBucket
+          DestPath: !Ref SupplyerPath
+          SourceBucket: !Ref NikolasBucket
+          SourcePath: !Ref StagingPathIN
+          FileName: !Ref FileName
+          JwtKey: !Ref JwtKey
+  GetFileFunction: # Adds a GET api endpoint at "/" via an Api event
+    Type: AWS::Serverless::Function
+    Properties:
+      Role: !GetAtt NikolasApiRole.Arn
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            Path: /GetFile
+            Method: get
+            RestApiId:
+              Ref: NikolasApiGateway
+      Runtime: python3.12
+      CodeUri: lambda
+      Handler: send_file.lambda_handler_file
+      MemorySize: 525
+      Timeout: 600
+      Environment: 
+        Variables:
+          DestBucket: !Ref NikolasBucket
+          DestPath: !Ref SupplyerPath
+          SourceBucket: !Ref NikolasBucket
+          SourcePath: !Ref StagingPathIN
+          FileName: !Ref FileName
+          JwtKey: !Ref JwtKey
+Outputs:
+  StackName:
+    Description: Deployed StackName for update
+    Value: !Ref AWS::StackName
+  UrlGet:
+    Description: Endpoint URL API REST
+    Value: !Sub https://${NikolasApiGateway}.execute-api.${AWS::Region}.amazonaws.com/${Stage}
+

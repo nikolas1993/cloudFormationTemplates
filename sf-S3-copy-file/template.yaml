@@ -1,0 +1,185 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Template CloudFormation - Exercices Nikolas
+
+Parameters:
+  SourceBucketName:
+    Description: SourceBucket's name
+    Type: String
+    Default: nik-formazione-source
+  SourcePath:
+    Type: String
+    Description: Source folder
+    Default: source
+  DestinationBucketName:
+    Description: DestinationBucket's name
+    Type: String
+    Default: nik-formazione-dest
+  DestinationPath:
+    Type: String
+    Description: Destination folder
+    Default: dest
+  S3CopyStateMachineName:
+    Description: S3CopyStateMachine's name
+    Type: String
+    Default: sfNikS3CopyStateMachine
+  S3CopyTrigger:
+    Type: String
+    Default: ENABLED
+    AllowedValues:
+      - ENABLED
+      - DISABLED
+
+Resources:
+  SourceBucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+      BucketName: !Ref SourceBucketName
+      MetricsConfigurations:
+        - Id: SourceBucketName
+      Tags:
+        - Key: "StackName"
+          Value: !Ref AWS::StackName
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: ObjectWriter
+
+  DestinationBucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+      BucketName: !Ref DestinationBucketName
+      MetricsConfigurations:
+        - Id: DestinationBucket
+      Tags:
+        - Key: "StackName"
+          Value: !Ref AWS::StackName
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: ObjectWriter
+
+  # TriggerPermission: # regola IAM che permette a EventBridge di chiamare State
+  #   Type: AWS::Lambda::Permission
+  #   Properties: 
+  #     FunctionName: !GetAtt S3CopyStateMachine.Arn
+  #     Action: lambda:InvokeFunction
+  #     Principal: events.amazonaws.com
+  #     SourceArn: !GetAtt TriggerEventRule.Arn
+
+  S3CopyStateMachine: #state-machine
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      Name: !Ref S3CopyStateMachineName
+      Type: STANDARD
+      DefinitionUri: state-machine.yaml
+      Role: !GetAtt S3CopyStateMachineRole.Arn
+      Logging:
+        Destinations:
+          - CloudWatchLogsLogGroup:
+              LogGroupArn: !GetAtt  S3CopyStateMachineLog.Arn
+        Level: ALL
+        IncludeExecutionData: True
+      DefinitionSubstitutions:
+        SourceBucket: !Ref SourceBucketName
+        SourcePath: !Ref SourcePath
+        DestinationBucket: !Ref DestinationBucketName
+        DestinationPath: !Ref DestinationPath
+        ApplicationName: !Ref S3CopyStateMachineName
+
+  S3CopyStateMachineLog:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 3
+      LogGroupName: !Sub /aws/vendedlogs/states/${S3CopyStateMachineName}-statemachine-logs
+
+  S3CopyStateMachineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - states.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: "buckets-and-logs"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogDelivery'
+                  - 'logs:GetLogDelivery'
+                  - 'logs:UpdateLogDelivery'
+                  - 'logs:DeleteLogDelivery'
+                  - 'logs:ListLogDeliveries'
+                  - 'logs:PutResourcePolicy'
+                  - 'logs:DescribeResourcePolicies'
+                  - 'logs:DescribeLogGroups'
+                  - 'cloudwatch:PutMetricData'
+                Resource: '*'
+              - Effect: Allow
+                Action: "s3:*"
+                Resource: !Sub "arn:aws:s3:::${SourceBucketName}/*"
+              - Effect: Allow
+                Action: "s3:*"
+                Resource: !Sub "arn:aws:s3:::${SourceBucketName}/"
+              - Effect: Allow
+                Action: "s3:*"
+                Resource: !Sub "arn:aws:s3:::${DestinationBucketName}/*"
+              - Effect: Allow
+                Action: "s3:*"
+                Resource: !Sub "arn:aws:s3:::${DestinationBucketName}/"
+              
+  TriggerEventRule: #rule event bridge trigger
+    Type: AWS::Events::Rule
+    Properties:
+      EventBusName: default
+      State: !Ref S3CopyTrigger
+      EventPattern: 
+        source: 
+          - "aws.s3"
+        detail-type:
+          - "Object Created"
+        detail: 
+          bucket:
+            name: 
+              - !Ref SourceBucketName
+      Targets:
+        - Id: S3CopyStateMachine-ID
+          Arn: !GetAtt S3CopyStateMachine.Arn
+          RoleArn: !GetAtt S3CopyStateMachineRole.Arn
+
+Outputs:
+  StackName:
+    Description: Deployed StackName for update
+    Value: !Ref AWS::StackName
+  StateMachineName:
+    Description: Deployed StateMachineName for update
+    Value: !Ref S3CopyStateMachine
+  SourceBucketName:
+    Description: Deployed S3SourceBucketName for update
+    Value: !Ref SourceBucketName
+  DestinationBucketName:
+    Description: Deployed DestinationBucketName for update
+    Value: !Ref DestinationBucketName

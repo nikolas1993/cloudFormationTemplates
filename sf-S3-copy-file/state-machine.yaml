@@ -1,0 +1,44 @@
+---
+StartAt: CopyInputFile
+States:
+  CopyInputFile:
+    Type: Task
+    Resource: arn:aws:states:::aws-sdk:s3:copyObject
+    Parameters:
+      Bucket: ${SourceBucketName}
+      CopySource.$: States.Format('${SourceBucket}/${SourcePath}/{}', $.filename)
+      Key.$: States.Format('${SourceBucketName}/{}-{}', $.filename, $$.Execution.StartTime)
+    ResultPath: null
+    Next: SkipDeleteSourceFile
+
+  SkipDeleteSourceFile:
+    Type: Choice
+    Choices:
+      - Variable: $.SkipDeleteSourceFile
+        BooleanEquals: true
+        Next: CopyToDestination
+    Default: DeleteInputFile
+
+  DeleteInputFile:
+    Type: Task
+    Resource: arn:aws:states:::aws-sdk:s3:deleteObject
+    Parameters:
+      Bucket: ${SourceBucket}
+      Key.$: States.Format('${SourcePath}/{}', $.filename)
+    ResultPath: null
+    Next: CopyToDestination
+
+  CopyToDestination:
+    Type: Task
+    Resource: arn:aws:states:::aws-sdk:s3:copyObject
+    Parameters:
+      Bucket: ${DestBucket}
+      CopySource.$: States.Format('${StagingBucket}/${DestStagingPath}/{}-{}', $.filename, $$.Execution.StartTime)
+      Key.$: States.Format('${DestPath}/{}',$.filename)
+    ResultPath: $.Last
+    Next: End
+    
+  End:
+    Type: Pass
+    End: true
+...
